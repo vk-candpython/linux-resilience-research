@@ -73,6 +73,8 @@
 
 ---
 
+# English
+
 ## 1. Configuration Section
 
 <details>
