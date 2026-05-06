@@ -312,7 +312,7 @@ def __antidebug():
                 v   = n[ 1 ]
 
                 if _sw(st):
-                    if v in {b'T', b't', b'Z', b'z'}:
+                    if v in (b'T', b't', b'Z', b'z'):
                         __die()
                     continue
                     
@@ -2422,7 +2422,7 @@ mount -t tmpfs       tmpfs       /tmp -o mode=1777    2>/dev/null
 ```python
 def setup_grub():
     _mm = mem
-    lbg = s_set((_mm(b'grub.cfg'), _mm(b'grub2.cfg')))
+    lbg = (_mm(b'grub.cfg'), _mm(b'grub2.cfg'))
     cfg = []
     auc = cfg.append
     
