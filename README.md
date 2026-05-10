@@ -2402,7 +2402,7 @@ mount -t tmpfs       tmpfs       /tmp -o mode=1777    2>/dev/null
     return (
         'nomodeset quiet nosplash fbcon=nodefer vt.global_cursor_default=0 '
         'printk.time=0 loglevel=0 audit=0 audit_backlog_limit=0 '
-        'selinux=0 apparmor=0 security=none lockdown=none iomem=relaxed '
+        'selinux=0 apparmor=0 lsm=none security=none lockdown=off iomem=relaxed '
         'acpi_no_static_ssdt acpi_sleep=off button.allow_power_off=0 '
         'mitigations=off nosmap nosmep kptr_restrict=0 '
         'initrd.shell=0 rd.shell=0 rd.emergency=reboot rd.rescue=reboot panic=0 reboot=force '
