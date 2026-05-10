@@ -2352,10 +2352,13 @@ def make_init():
     def quote(s, _ch=s_set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@%+=:,./-_')):
         if not s:
             return "''"
+
         if all(c in _ch for c in s):
             return s
-        return "'" + s.replace("'", "'\"'\"'") + "'"
-    
+
+        return f"'{s.replace('\'', '\'\"\'\"\'')}'"
+
+
     path_init = '/sbin/.init'
     
     exe = [quote(__file__), FLAG_ROOT, FLAG_INIT]
